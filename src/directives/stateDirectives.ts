@@ -12,7 +12,7 @@ import { ng as angular } from "../angular";
 import { IAugmentedJQuery, ITimeoutService, IScope, IInterpolateService } from "angular";
 
 import {
-    Obj, extend, forEach, tail, isString, isObject, parse, noop, unnestR, identity, uniqR, inArray, removeFrom,
+    Obj, extend, forEach, tail, isString, isObject, isArray, parse, noop, unnestR, identity, uniqR, inArray, removeFrom,
     RawParams, PathNode, StateOrName, StateService, StateDeclaration, UIRouter
 } from "ui-router-core";
 import { UIViewData } from "./viewDirective";
@@ -96,6 +96,31 @@ function defaultOpts(el: IAugmentedJQuery, $state: StateService) {
   };
 }
 
+/** @hidden */
+function bindEvents(element: IAugmentedJQuery, scope: IScope, hookFn: (e: JQueryMouseEventObject) => void, uiStateOpts: any): void {
+  let events;
+
+  if (uiStateOpts) {
+    events = uiStateOpts.events;
+  }
+
+  if (!isArray(events)) {
+    events = ['click'];
+  }
+
+  let on = element.on ? 'on' : 'bind';
+  for (let event of events) {
+    element[on](event, hookFn);
+  }
+
+  scope.$on('$destroy', function() {
+    let off = element.off ? 'off' : 'unbind';
+    for (let event of events) {
+      element[off](event, hookFn);
+    }
+  });
+}
+
 /**
  * `ui-sref`: A directive for linking to a state
  *
@@ -162,6 +187,16 @@ function defaultOpts(el: IAugmentedJQuery, $state: StateService) {
  * #### Example:
  * ```html
  * <a ui-sref="home" ui-sref-opts="{ reload: true }">Home</a>
+ * ```
+ *
+ * ### Other DOM Events
+ *
+ * You can also customize which DOM events to respond to (instead of `click`) by
+ * providing an `events` array in the `ui-sref-opts` attribute.
+ *
+ * #### Example:
+ * ```html
+ * <input type="text" ui-sref="contacts" ui-sref-opts="{ events: ['change', 'blur'] }">
  * ```
  *
  * ### Highlighting the active link
@@ -249,10 +284,10 @@ uiSref = ['$uiRouter', '$timeout',
 
         if (ref.paramExpr) {
           scope.$watch(ref.paramExpr, function (val) {
-            rawDef.uiStateParams = angular.copy(val);
+            rawDef.uiStateParams = extend({}, val);
             update();
           }, true);
-          rawDef.uiStateParams = angular.copy(scope.$eval(ref.paramExpr));
+          rawDef.uiStateParams = extend({}, scope.$eval(ref.paramExpr));
         }
 
         update();
@@ -262,10 +297,7 @@ uiSref = ['$uiRouter', '$timeout',
 
         if (!type.clickable) return;
         hookFn = clickHook(element, $state, $timeout, type, getDef);
-        element[element.on ? 'on' : 'bind']("click", hookFn);
-        scope.$on('$destroy', function () {
-          element[element.off ? 'off' : 'unbind']("click", hookFn);
-        });
+        bindEvents(element, scope, hookFn, rawDef.uiStateOpts);
       }
     };
   }];
@@ -324,6 +356,16 @@ uiSref = ['$uiRouter', '$timeout',
  * #### Example:
  * ```html
  * <a ui-state="returnto.state" ui-state-opts="{ reload: true }">Home</a>
+ * ```
+ *
+ * ### Other DOM Events
+ *
+ * You can also customize which DOM events to respond to (instead of `click`) by
+ * providing an `events` array in the `ui-state-opts` attribute.
+ *
+ * #### Example:
+ * ```html
+ * <input type="text" ui-state="contacts" ui-state-opts="{ events: ['change', 'blur'] }">
  * ```
  *
  * ### Highlighting the active link
@@ -390,10 +432,7 @@ uiState = ['$uiRouter', '$timeout',
 
         if (!type.clickable) return;
         hookFn = clickHook(element, $state, $timeout, type, getDef);
-        element[element.on ? 'on' : 'bind']("click", hookFn);
-        scope.$on('$destroy', function () {
-          element[element.off ? 'off' : 'unbind']("click", hookFn);
-        });
+        bindEvents(element, scope, hookFn, rawDef.uiStateOpts);
       }
     };
   }];

@@ -635,6 +635,7 @@ export interface Ng1Controller {
    *       }
    *     }
    *   }
+   * }
    * ```
    *
    *
@@ -671,4 +672,10 @@ export interface TemplateFactoryProvider {
    * @param useUnsafeHttpService `true` to use `$http` to fetch templates
    */
   useHttpService(useUnsafeHttpService: boolean);
+}
+
+declare module "ui-router-core/lib/state/stateRegistry" {
+  interface StateRegistry {
+    register(state: Ng1StateDeclaration)
+  }
 }

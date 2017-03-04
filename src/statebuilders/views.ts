@@ -1,9 +1,9 @@
 /** @module ng1 */ /** */
 import { ng as angular } from "../angular";
 import {
-    State, pick, forEach, anyTrueR, tail, extend,
+    StateObject, pick, forEach, tail, extend,
     isArray, isInjectable, isDefined, isString, services, trace,
-    ViewConfig, ViewService, ViewConfigFactory, PathNode, ResolveContext, Resolvable, RawParams, IInjectable
+    ViewConfig, ViewService, ViewConfigFactory, PathNode, ResolveContext, Resolvable, IInjectable
 } from "ui-router-core";
 import { Ng1ViewDeclaration } from "../interface";
 import { TemplateFactory } from "../templateFactory";
@@ -29,7 +29,7 @@ const hasAnyKey = (keys, obj) =>
  * If no `views: {}` property exists on the [[StateDeclaration]], then it creates the `views` object
  * and applies the state-level configuration to a view named `$default`.
  */
-export function ng1ViewsBuilder(state: State) {
+export function ng1ViewsBuilder(state: StateObject) {
   // Do not process root state
   if (!state.parent) return {};
 
@@ -37,10 +37,20 @@ export function ng1ViewsBuilder(state: State) {
       ctrlKeys = ['controller', 'controllerProvider', 'controllerAs', 'resolveAs'],
       compKeys = ['component', 'bindings', 'componentProvider'],
       nonCompKeys = tplKeys.concat(ctrlKeys),
-      allKeys = compKeys.concat(nonCompKeys);
+      allViewKeys = compKeys.concat(nonCompKeys);
+
+  // Do not allow a state to have both state-level props and also a `views: {}` property.
+  // A state without a `views: {}` property can declare properties for the `$default` view as properties of the state.
+  // However, the `$default` approach should not be mixed with a separate `views: ` block.
+  if (isDefined(state.views) && hasAnyKey(allViewKeys, state)) {
+    throw new Error(`State '${state.name}' has a 'views' object. ` +
+        `It cannot also have "view properties" at the state level.  ` +
+        `Move the following properties into a view (in the 'views' object): ` +
+        ` ${allViewKeys.filter(key => isDefined(state[key])).join(", ")}`);
+  }
 
   let views: { [key: string]: Ng1ViewDeclaration } = {},
-      viewsObject = state.views || { "$default": pick(state, allKeys) };
+      viewsObject = state.views || { "$default": pick(state, allViewKeys) };
 
   forEach(viewsObject, function (config: Ng1ViewDeclaration, name: string) {
     // Account for views: { "": { template... } }
@@ -48,6 +58,10 @@ export function ng1ViewsBuilder(state: State) {
     // Account for views: { header: "headerComponent" }
     if (isString(config)) config = { component: <string> config };
 
+    // Make a shallow copy of the config object
+    config = extend({}, config);
+
+    // Do not allow a view to mix props for component-style view with props for template/controller-style view
     if (hasAnyKey(compKeys, config) && hasAnyKey(nonCompKeys, config)) {
       throw new Error(`Cannot combine: ${compKeys.join("|")} with: ${nonCompKeys.join("|")} in stateview: '${name}@${state.name}'`);
     }

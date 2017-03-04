@@ -1,6 +1,6 @@
-import * as angular from "angular";
-import "./util/matchers";
-import { extend } from "ui-router-core";
+import * as angular from 'angular';
+import './util/matchers';
+import { extend } from 'ui-router-core';
 
 declare let inject, jasmine;
 
@@ -403,7 +403,7 @@ describe('uiView', function () {
       expect(_scope.$ctrl.$resolve.user).toBe('joeschmoe');
     }));
 
-    it('should use the view-level resolveAs over the state-level resolveAs', inject(function ($state, $q, $timeout) {
+    it('should not allow both view-level resolveAs and state-level resolveAs on the same state', inject(function ($state, $q, $timeout) {
       let views = {
         "$default": {
           controller: controller,
@@ -411,14 +411,8 @@ describe('uiView', function () {
           resolveAs: '$$$resolve'
         }
       };
-      let state = angular.extend({}, _state, { resolveAs: 'foo', views: views })
-      $stateProvider.state(state);
-      elem.append($compile('<div><ui-view></ui-view></div>')(scope));
-
-      $state.transitionTo('resolve'); $q.flush(); $timeout.flush();
-      expect(elem.text()).toBe('joeschmoe');
-      expect(_scope.$$$resolve).toBeDefined();
-      expect(_scope.$$$resolve.user).toBe('joeschmoe');
+      let state = angular.extend({}, _state, { resolveAs: 'foo', views: views });
+      expect(() => $stateProvider.state(state)).toThrowError(/resolveAs/);
     }));
   });
 
@@ -1371,6 +1365,20 @@ describe('angular 1.5+ style .component()', function() {
 
         expect(header.textContent).toBe('#awesome#');
         expect(content.textContent).toBe('-DATA!-');
+      });
+
+      // Test for https://github.com/angular-ui/ui-router/issues/3353
+      it('should allow different states to reuse view declaration', function () {
+        let views = {
+          header: { component: 'header' },
+          content: { component: 'ngComponent' },
+        };
+
+        let stateDef1 = { name: 'def1', url: '/def1', views: views, };
+        let stateDef2 = { name: 'def2', url: '/def2', views: views, };
+
+        $stateProvider.state(stateDef1);
+        $stateProvider.state(stateDef2);
       });
     });
   }
